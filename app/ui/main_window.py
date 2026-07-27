@@ -1,9 +1,9 @@
-"""Main control window: start/stop toggle, status, button to show subtitle."""
-from PyQt6.QtCore import Qt, pyqtSlot
+"""Main control window — dark tech style."""
+from PyQt6.QtCore import Qt, pyqtSlot, QSize
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QLabel, QStatusBar,
-                             QSystemTrayIcon, QMenu, QApplication)
-from PyQt6.QtGui import QIcon, QAction
+                             QPushButton, QLabel, QApplication,
+                             QSystemTrayIcon, QMenu)
+from PyQt6.QtGui import QIcon, QAction, QFont, QColor
 
 from app.core import config as cfg_mod
 from app.ui.subtitle_window import SubtitleWindow
@@ -11,11 +11,62 @@ from app.ui.settings_dialog import SettingsDialog
 from app.controller import SubtitleController
 
 
+# Dark theme palette
+DARK_BG = "#0f0f1a"
+DARK_CARD = "#1a1a2e"
+ACCENT = "#00d4ff"
+ACCENT_HOVER = "#33e0ff"
+TEXT_PRIMARY = "#e0e0e0"
+TEXT_SECONDARY = "#8888aa"
+BORDER = "#2a2a4a"
+
+MAIN_STYLE = f"""
+QMainWindow {{
+    background-color: {DARK_BG};
+}}
+QLabel {{
+    color: {TEXT_PRIMARY};
+    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+}}
+QPushButton#startBtn {{
+    background-color: {ACCENT};
+    color: {DARK_BG};
+    border: none;
+    border-radius: 35px;
+    padding: 0;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: "Microsoft YaHei";
+}}
+QPushButton#startBtn:hover {{
+    background-color: {ACCENT_HOVER};
+}}
+QPushButton#startBtn:pressed {{
+    background-color: {ACCENT};
+}}
+QPushButton#iconBtn {{
+    background-color: transparent;
+    color: {TEXT_SECONDARY};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: "Microsoft YaHei";
+}}
+QPushButton#iconBtn:hover {{
+    background-color: {DARK_CARD};
+    color: {TEXT_PRIMARY};
+    border-color: {ACCENT};
+}}
+"""
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI 实时字幕 1.0")
-        self.resize(520, 160)
+        self.setWindowTitle("AI 实时字幕")
+        self.resize(480, 340)
+        self.setStyleSheet(MAIN_STYLE)
         self.cfg = cfg_mod.load()
 
         # subtitle window (floating)
@@ -37,36 +88,67 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         v = QVBoxLayout(central)
+        v.setContentsMargins(40, 30, 40, 30)
+        v.setSpacing(20)
+        v.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        head = QLabel("🎧  AI 实时字幕 — 自动识别系统声音 (网易云 / 浏览器 / 任意播放器)")
-        head.setStyleSheet("font-size: 15px; font-weight: 600; padding: 6px 0;")
-        v.addWidget(head)
+        # Title
+        title = QLabel("AI 实时字幕")
+        title.setStyleSheet("font-size: 28px; font-weight: 700; color: #ffffff;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(title)
 
-        # engine + toggle row
-        row1 = QHBoxLayout()
-        self.lbl_engine = QLabel("引擎: 未启动")
-        self.lbl_engine.setStyleSheet("color: #555;")
-        row1.addWidget(self.lbl_engine)
-        row1.addStretch()
-        self.btn_toggle = QPushButton("▶  开始")
-        self.btn_toggle.setStyleSheet("padding: 8px 28px; font-weight: 600;")
+        # Subtitle
+        sub = QLabel("自动识别系统声音，实时显示字幕")
+        sub.setStyleSheet(f"font-size: 13px; color: {TEXT_SECONDARY};")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(sub)
+
+        v.addSpacing(20)
+
+        # Big circular start/stop button
+        self.btn_toggle = QPushButton("▶")
+        self.btn_toggle.setObjectName("startBtn")
+        self.btn_toggle.setFixedSize(70, 70)
+        self.btn_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_toggle.clicked.connect(self._on_toggle)
-        row1.addWidget(self.btn_toggle)
-        v.addLayout(row1)
+        v.addWidget(self.btn_toggle, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # subtitle button row
-        row2 = QHBoxLayout()
-        self.btn_show_sub = QPushButton("显示 / 隐藏字幕")
+        # Status label under button
+        self.lbl_status = QLabel("点击开始识别")
+        self.lbl_status.setStyleSheet(f"font-size: 12px; color: {TEXT_SECONDARY};")
+        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(self.lbl_status)
+
+        v.addStretch()
+
+        # Engine info
+        self.lbl_engine = QLabel("引擎: 未启动")
+        self.lbl_engine.setStyleSheet(f"font-size: 11px; color: {TEXT_SECONDARY};")
+        self.lbl_engine.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(self.lbl_engine)
+
+        # Bottom action bar
+        h = QHBoxLayout()
+        h.setSpacing(12)
+        h.addStretch()
+
+        self.btn_show_sub = QPushButton("字幕")
+        self.btn_show_sub.setObjectName("iconBtn")
+        self.btn_show_sub.setFixedWidth(70)
+        self.btn_show_sub.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_show_sub.clicked.connect(self._toggle_subtitle)
-        self.btn_settings = QPushButton("⚙  设置")
-        self.btn_settings.clicked.connect(self._open_settings)
-        row2.addWidget(self.btn_show_sub)
-        row2.addWidget(self.btn_settings)
-        row2.addStretch()
-        v.addLayout(row2)
+        h.addWidget(self.btn_show_sub)
 
-        self.setStatusBar(QStatusBar())
-        self.statusBar().showMessage("就绪")
+        self.btn_settings = QPushButton("设置")
+        self.btn_settings.setObjectName("iconBtn")
+        self.btn_settings.setFixedWidth(70)
+        self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_settings.clicked.connect(self._open_settings)
+        h.addWidget(self.btn_settings)
+
+        h.addStretch()
+        v.addLayout(h)
 
     def _build_tray(self) -> None:
         if not QSystemTrayIcon.isSystemTrayAvailable():
@@ -74,10 +156,16 @@ class MainWindow(QMainWindow):
             return
         self.tray = QSystemTrayIcon(self.windowIcon(), self)
         menu = QMenu()
-        a_show = QAction("显示主窗口", self); a_show.triggered.connect(self.showNormal)
-        a_toggle = QAction("显示/隐藏字幕", self); a_toggle.triggered.connect(self._toggle_subtitle)
-        a_quit = QAction("退出", self); a_quit.triggered.connect(self._quit_app)
-        menu.addAction(a_show); menu.addAction(a_toggle); menu.addSeparator(); menu.addAction(a_quit)
+        a_show = QAction("显示主窗口", self)
+        a_show.triggered.connect(self.showNormal)
+        a_toggle = QAction("显示/隐藏字幕", self)
+        a_toggle.triggered.connect(self._toggle_subtitle)
+        a_quit = QAction("退出", self)
+        a_quit.triggered.connect(self._quit_app)
+        menu.addAction(a_show)
+        menu.addAction(a_toggle)
+        menu.addSeparator()
+        menu.addAction(a_quit)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda r: self._on_tray_activated(r))
         self.tray.show()
@@ -94,12 +182,13 @@ class MainWindow(QMainWindow):
     def _on_toggle(self):
         if self.controller.running:
             self.controller.stop()
-            self.btn_toggle.setText("▶  开始")
+            self.btn_toggle.setText("▶")
+            self.lbl_status.setText("点击开始识别")
             self._refresh_status()
         else:
             self.controller.start()
-            self.btn_toggle.setText("■  停止")
-            # auto show subtitle on first start
+            self.btn_toggle.setText("■")
+            self.lbl_status.setText("识别中...")
             if not self.subtitle_win.isVisible():
                 self.subtitle_win.show()
 
@@ -115,12 +204,12 @@ class MainWindow(QMainWindow):
         if dlg.exec() == SettingsDialog.DialogCode.Accepted:
             self.cfg = dlg.result_config()
             self.controller.update_config(self.cfg)
-            self.statusBar().showMessage("设置已保存", 2000)
+            self.lbl_status.setText("设置已保存")
 
     # ---------------- Controller callbacks ----------------
     @pyqtSlot(str)
     def _on_status(self, msg: str):
-        self.statusBar().showMessage(msg, 4000)
+        self.lbl_status.setText(msg)
 
     @pyqtSlot(str)
     def _on_engine(self, name: str):
@@ -129,9 +218,11 @@ class MainWindow(QMainWindow):
     def _refresh_status(self):
         self.lbl_engine.setText(f"引擎: {self.controller.current_engine_name}")
         if self.controller.running:
-            self.btn_toggle.setText("■  停止")
+            self.btn_toggle.setText("■")
+            self.lbl_status.setText("识别中...")
         else:
-            self.btn_toggle.setText("▶  开始")
+            self.btn_toggle.setText("▶")
+            self.lbl_status.setText("点击开始识别")
 
     def closeEvent(self, e):
         self.controller.stop()

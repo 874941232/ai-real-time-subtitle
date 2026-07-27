@@ -1,4 +1,4 @@
-"""Simple floating subtitle window — clean design."""
+"""Floating subtitle window — dark tech style."""
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QVariantAnimation, QEasingCurve, QSize, QEvent
 from PyQt6.QtGui import QFont, QFontMetrics, QColor
 from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout,
@@ -49,50 +49,80 @@ class SubtitleWindow(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
         )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(8, 4, 8, 8)
+        # Main container with rounded corners and border
+        self._container = QWidget(self)
+        self._container.setObjectName("container")
+        self._container.setStyleSheet(
+            f"""
+            QWidget#container {{
+                background-color: {self.cfg.bg_color};
+                border: 1px solid #3a3a5a;
+                border-radius: 12px;
+            }}
+            """
+        )
+
+        outer = QVBoxLayout(self._container)
+        outer.setContentsMargins(12, 8, 12, 12)
         outer.setSpacing(4)
 
-        top_bar = QHBoxLayout()
+        # Top toolbar (auto-hide)
+        self._toolbar = QWidget(self._container)
+        self._toolbar.setStyleSheet(
+            f"""
+            background-color: transparent;
+            """
+        )
+        top_bar = QHBoxLayout(self._toolbar)
+        top_bar.setContentsMargins(0, 0, 0, 0)
+        top_bar.setSpacing(6)
         top_bar.addStretch()
 
-        self._btn_text_color = QPushButton("A", self)
-        self._btn_text_color.setFixedSize(24, 24)
+        self._btn_text_color = QPushButton("A", self._toolbar)
+        self._btn_text_color.setFixedSize(22, 22)
         self._btn_text_color.setToolTip("文字颜色")
+        self._btn_text_color.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_text_color.clicked.connect(self._pick_text_color)
         top_bar.addWidget(self._btn_text_color)
 
-        self._btn_bg_color = QPushButton("▣", self)
-        self._btn_bg_color.setFixedSize(24, 24)
+        self._btn_bg_color = QPushButton("▣", self._toolbar)
+        self._btn_bg_color.setFixedSize(22, 22)
         self._btn_bg_color.setToolTip("背景颜色")
+        self._btn_bg_color.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_bg_color.clicked.connect(self._pick_bg_color)
         top_bar.addWidget(self._btn_bg_color)
 
-        self._btn_minus = QPushButton("−", self)
-        self._btn_minus.setFixedSize(24, 24)
+        self._btn_minus = QPushButton("−", self._toolbar)
+        self._btn_minus.setFixedSize(22, 22)
         self._btn_minus.setToolTip("减小字体")
+        self._btn_minus.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_minus.clicked.connect(self._decrease_font)
         top_bar.addWidget(self._btn_minus)
 
-        self._btn_plus = QPushButton("+", self)
-        self._btn_plus.setFixedSize(24, 24)
+        self._btn_plus = QPushButton("+", self._toolbar)
+        self._btn_plus.setFixedSize(22, 22)
         self._btn_plus.setToolTip("增大字体")
+        self._btn_plus.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_plus.clicked.connect(self._increase_font)
         top_bar.addWidget(self._btn_plus)
 
-        self._btn_close = QPushButton("✕", self)
-        self._btn_close.setFixedSize(24, 24)
+        self._btn_close = QPushButton("✕", self._toolbar)
+        self._btn_close.setFixedSize(22, 22)
         self._btn_close.setToolTip("隐藏字幕窗口")
+        self._btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_close.clicked.connect(self.hide)
         top_bar.addWidget(self._btn_close)
-        outer.addLayout(top_bar)
+        outer.addWidget(self._toolbar)
 
-        self._content = QWidget(self)
+        # Content area
+        self._content = QWidget(self._container)
         self._content.setAutoFillBackground(True)
         pal = self._content.palette()
-        pal.setColor(self._content.backgroundRole(), QColor(0, 0, 0))
+        pal.setColor(self._content.backgroundRole(), QColor(0, 0, 0, 1))
         self._content.setPalette(pal)
         self._content.installEventFilter(self)
         outer.addWidget(self._content, 1)
@@ -107,12 +137,21 @@ class SubtitleWindow(QWidget):
         self._label_bottom.setWordWrap(True)
         self._label_bottom.setAutoFillBackground(True)
 
-        self._size_grip = QSizeGrip(self)
-        self._size_grip.setFixedSize(16, 16)
+        # Size grip
+        self._size_grip = QSizeGrip(self._container)
+        self._size_grip.setFixedSize(14, 14)
+        self._size_grip.setStyleSheet(
+            "QSizeGrip { background: rgba(255,255,255,0.2); border-radius: 3px; }"
+            "QSizeGrip:hover { background: rgba(255,255,255,0.4); }"
+        )
+
+        # Toolbar auto-hide timer
+        self._toolbar_timer = None
+        self._toolbar_opacity = 1.0
 
         self._apply_style()
         self._apply_position()
-        self.setMinimumSize(QSize(300, 80))
+        self.setMinimumSize(QSize(320, 90))
         self.resize(720, 200)
 
     def _line_height(self) -> int:
@@ -131,25 +170,44 @@ class SubtitleWindow(QWidget):
     def _apply_style(self) -> None:
         font = QFont(self.cfg.font_family, self.cfg.font_size)
         font.setBold(True)
+
+        # Update container background
+        self._container.setStyleSheet(
+            f"""
+            QWidget#container {{
+                background-color: {self.cfg.bg_color};
+                border: 1px solid #3a3a5a;
+                border-radius: 12px;
+            }}
+            """
+        )
+
         label_style = (
             f"color: {self.cfg.text_color};"
-            f" background-color: {self.cfg.bg_color};"
+            f" background-color: transparent;"
             " padding: 8px 16px;"
         )
         for lbl in [self._label_top, self._label_bottom]:
             lbl.setFont(font)
             lbl.setStyleSheet(label_style)
-        self.setWindowOpacity(self.cfg.opacity)
 
-        self._btn_text_color.setStyleSheet(
-            f"color: {self.cfg.text_color};"
-            f" background-color: transparent;"
-            f" border: 1px solid gray;"
+        # Toolbar button styles
+        btn_style = (
+            f"QPushButton {{"
+            f"    background-color: rgba(255,255,255,0.1);"
+            f"    color: {self.cfg.text_color};"
+            f"    border: none;"
+            f"    border-radius: 4px;"
+            f"    font-size: 11px;"
+            f"    font-weight: 600;"
+            f"}}"
+            f"QPushButton:hover {{"
+            f"    background-color: rgba(255,255,255,0.25);"
+            f"}}"
         )
-        self._btn_bg_color.setStyleSheet(
-            f"background-color: {self.cfg.bg_color};"
-            f" border: 1px solid gray;"
-        )
+        for btn in [self._btn_text_color, self._btn_bg_color,
+                    self._btn_minus, self._btn_plus, self._btn_close]:
+            btn.setStyleSheet(btn_style)
 
         self._layout_labels()
         self._refresh_display()
@@ -194,8 +252,12 @@ class SubtitleWindow(QWidget):
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
+        self._container.resize(self.size())
         self._layout_labels()
-        self._size_grip.move(self.width() - 16, self.height() - 16)
+        self._size_grip.move(
+            self._container.width() - 18,
+            self._container.height() - 18
+        )
         self._apply_style()
 
     def _refresh_display(self) -> None:
