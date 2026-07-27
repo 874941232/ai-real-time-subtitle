@@ -1,0 +1,8 @@
+PyQt6==6.7.1
+soundcard==0.4.3
+numpy==1.26.4
+requests==2.32.3
+websocket-client==1.8.0
+onnxruntime
+faster-whisper==1.0.3
+pyinstaller==6.10.0
