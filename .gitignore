@@ -11,3 +11,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.egg-info/
+*.onnx
+*.json
+*.yaml
+*.txt
